@@ -2,16 +2,18 @@
 
 require_relative 'workflow/version'
 require_relative 'workflow/result'
+require_relative 'workflow/nodes/node'
+require_relative 'workflow/runner'
 
 # Workflow engine to run isolated workflow steps with clear success/failure semantics.
 module Workflow
   module_function
 
   def Success(value = nil)
-    Workflow::Success.new(value)
+    Success.new(value)
   end
 
   def Failure(error = nil)
-    Workflow::Failure.new(error)
+    Failure.new(error)
   end
 end

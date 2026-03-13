@@ -10,5 +10,6 @@ group :development, :test do
   gem 'rspec-expectations'
   gem 'rspec-mocks'
   gem 'rubocop'
-  gem 'rubocop-rspec'
+  gem 'rubocop-minitest'
+  gem 'rubocop-performance'
 end
