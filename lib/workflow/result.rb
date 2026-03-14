@@ -26,6 +26,10 @@ module Workflow
       [self.class, payload].hash
     end
 
+    def deconstruct
+      [payload]
+    end
+
     protected
 
     attr_reader :payload

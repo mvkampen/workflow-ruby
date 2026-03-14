@@ -1,56 +1,107 @@
 # frozen_string_literal: true
 
 module Workflow
-  # Runner is responsible for managing and executing workflow nodes.
-  # It allows registering nodes by name and running them in sequence, passing results between them.
+  # Runner executes registered nodes by traversing direct edges from a start vertex.
   class Runner
-    def initialize(nodes: {})
+    def initialize
       @nodes = {}
-      nodes.each do |name, node|
-        register(name, node)
-      end
+      @edges = Hash.new { |h, k| h[k] = [] }
     end
 
-    def register(name, node = nil, &block)
+    def add_node(vertex, node = nil, &block)
       raise ArgumentError, 'provide a node or a block, not both' if node.is_a?(Node) && block
 
-      callable = node || Workflow::Node.new(&block)
-      @nodes[normalize_name(name)] = callable
-      self
+      vertex = normalize_vertex(vertex)
+      node ||= Workflow::Node.new(&block)
+      @nodes[vertex] = node
+
+      [vertex, node]
     end
 
-    def registered?(name)
-      @nodes.key?(normalize_name(name))
+    def add_edge(from, to)
+      from = normalize_vertex(from)
+      to = normalize_vertex(to)
+
+      raise ArgumentError, 'from node not found' unless from.is_a?(Vertex::Start) || @nodes.key?(from)
+      raise ArgumentError, 'to node not found' unless @nodes.key?(to)
+
+      edge = Workflow::Edge(from:, to:)
+      @edges[edge.from] << edge
+      edge
     end
 
-    def call(name, message = nil)
-      execute(fetch(name), message)
-    end
+    # rubocop:disable Metrics/MethodLength
+    def run(start:, input: nil)
+      raise ArgumentError, 'start must be a Workflow::Vertex::Start' unless start.is_a?(Vertex::Start)
 
-    def run(*names, input: nil)
-      names.reduce(Workflow::Success(input)) do |result, name|
-        result.bind { |value| call(name, value) }
+      current_vertex = next_vertex_from(start)
+      current_value = input
+
+      loop do
+        result = call(current_vertex, current_value)
+        return result if result.failure?
+
+        signal, current_value = unpack_success(result)
+
+        case signal
+        in Signal::Stop
+          return Workflow::Success(current_value)
+        in Signal::Continue
+          current_vertex = next_vertex_from(current_vertex)
+        else
+          raise ArgumentError, "unsupported signal #{signal.inspect}"
+        end
       end
     end
+    # rubocop:enable Metrics/MethodLength
 
     private
 
-    def execute(node, message)
+    def call(vertex, message = nil)
+      node = fetch_node(vertex)
       result = node.call(message)
+      return result if Result.valid_result?(result)
 
-      raise TypeError, "#{node.class} must return a Workflow::Result" unless Result.valid_result?(result)
-
-      result
+      raise TypeError, "#{node.class} must return a Workflow::Result"
     end
 
-    def fetch(name)
-      @nodes.fetch(normalize_name(name))
+    def fetch_node(vertex)
+      @nodes.fetch(vertex)
     rescue KeyError
-      raise KeyError, "unknown node registered as #{name.inspect}"
+      raise KeyError, "unknown node registered as #{vertex}"
     end
 
-    def normalize_name(name)
-      name.to_sym
+    def next_vertex_from(vertex)
+      edges = @edges.fetch(vertex) do
+        raise KeyError, "unknown outgoing edge from #{vertex.inspect}"
+      end
+
+      raise ArgumentError, "expected exactly one outgoing edge from #{vertex.inspect}" unless edges.one?
+
+      edges.first.to
+    end
+
+    def unpack_success(result)
+      payload = result.value!
+
+      case payload
+      in [Signal => signal, value]
+        [signal, value]
+      else
+        raise TypeError, 'successful node results must return [Workflow::Signal, value]'
+      end
+    end
+
+    def normalize_vertex(value)
+      case value
+      in Vertex then value
+      in Symbol
+        Vertex.new(value)
+      in String
+        Vertex.new(value.to_sym)
+      else
+        raise ArgumentError, "unsupported vertex #{value.inspect}"
+      end
     end
   end
 end

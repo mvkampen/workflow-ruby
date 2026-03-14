@@ -14,7 +14,7 @@ Layout/LineLength:
 
 Naming/MethodName:
   AllowedPatterns:
-    - "\\A(?:Success|Failure)\\z"
+    - "\\A(?:Success|Failure|Start|Continue|Stop|Edge|Vertex)\\z"
 
 Metrics/BlockLength:
   Exclude:

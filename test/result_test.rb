@@ -36,7 +36,7 @@ describe Workflow::Result do
   end
 
   describe 'value semantics' do
-    it 'compares and hashes by type and payload' do
+    it 'compares and hashes by type and wrapped value' do
       first = Success('ok')
       second = Success('ok')
       failure = Failure('ok')
@@ -44,6 +44,26 @@ describe Workflow::Result do
       expect(first).to eq(second)
       expect(first.hash).to eq(second.hash)
       expect(first).not_to eq(failure)
+    end
+  end
+
+  describe 'pattern matching' do
+    it 'supports class-pattern matching with a single value slot' do
+      success = Success('ok')
+      failure = Failure(StandardError.new('boom'))
+
+      success_match = case success
+                      in Workflow::Success(String => payload)
+                        payload
+                      end
+
+      failure_match = case failure
+                      in Workflow::Failure(StandardError => payload)
+                        payload.message
+                      end
+
+      expect(success_match).to eq('ok')
+      expect(failure_match).to eq('boom')
     end
   end
 end
