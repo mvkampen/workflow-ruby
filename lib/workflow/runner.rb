@@ -30,36 +30,42 @@ module Workflow
       edge
     end
 
-    # rubocop:disable Metrics/MethodLength
-    def run(start:, input: nil)
+    def run(start:, state:)
       raise ArgumentError, 'start must be a Workflow::Vertex::Start' unless start.is_a?(Vertex::Start)
 
       current_vertex = next_vertex_from(start)
-      current_value = input
+      current_value = state
 
       loop do
         result = call(current_vertex, current_value)
         return result if result.failure?
 
         signal, current_value = unpack_success(result)
-
-        case signal
-        in Signal::Stop
-          return Workflow::Success(current_value)
-        in Signal::Continue
-          current_vertex = next_vertex_from(current_vertex)
-        else
-          raise ArgumentError, "unsupported signal #{signal.inspect}"
-        end
+        current_vertex, terminal_result = advance(signal, current_value, current_vertex)
+        return terminal_result if terminal_result
       end
     end
-    # rubocop:enable Metrics/MethodLength
 
     private
 
-    def call(vertex, message = nil)
+    def advance(signal, state, current_vertex)
+      case signal
+      in Signal::Stop()
+        [current_vertex, Workflow::Success(state)]
+      in Signal::Stop(result)
+        [current_vertex, Workflow::Success(result)]
+      in Signal::Compensate | Signal::Retry
+        [current_vertex, Workflow::Success([signal, state])]
+      in Signal::Continue
+        [next_vertex_from(current_vertex), nil]
+      else
+        raise ArgumentError, "unsupported signal #{signal.inspect}"
+      end
+    end
+
+    def call(vertex, state)
       node = fetch_node(vertex)
-      result = node.call(message)
+      result = node.call(state)
       return result if Result.valid_result?(result)
 
       raise TypeError, "#{node.class} must return a Workflow::Result"
@@ -103,5 +109,6 @@ module Workflow
         raise ArgumentError, "unsupported vertex #{value.inspect}"
       end
     end
+
   end
 end

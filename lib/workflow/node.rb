@@ -12,8 +12,8 @@ module Workflow
       raise ArgumentError, 'callable node requires a callable object or block' unless @callable
     end
 
-    def call(message)
-      @callable.call(message)
+    def call(state)
+      @callable.call(state)
     end
   end
 end

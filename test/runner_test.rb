@@ -60,7 +60,7 @@ describe Workflow::Runner do
       runner.add_edge(:trim, :upcase)
       runner.add_edge(:upcase, :finish)
 
-      expect(runner.run(start:, input: '  hello  ')).to eq(Success('HELLO!'))
+      expect(runner.run(start:, state: '  hello  ')).to eq(Success('HELLO!'))
     end
 
     it 'stops immediately on failure without shared state' do
@@ -79,7 +79,7 @@ describe Workflow::Runner do
       runner.add_edge(start, :first)
       runner.add_edge(:first, :second)
 
-      result = runner.run(start:, input: :start)
+      result = runner.run(start:, state: :start)
 
       expect(result).to eq(Failure(:boom))
       expect(observed).to eq([%i[first start]])
@@ -89,7 +89,7 @@ describe Workflow::Runner do
       runner = Workflow::Runner.new
       start = Workflow::Vertex::Start.new
 
-      expect { runner.run(start:, input: 2) }
+      expect { runner.run(start:, state: 2) }
         .to raise_error(KeyError, /unknown outgoing edge/)
     end
 
@@ -104,7 +104,7 @@ describe Workflow::Runner do
       runner.add_edge(:first, :second)
       runner.add_edge(:first, :third)
 
-      expect { runner.run(start:, input: :value) }
+      expect { runner.run(start:, state: :value) }
         .to raise_error(ArgumentError, /expected exactly one outgoing edge/)
     end
 
@@ -115,7 +115,7 @@ describe Workflow::Runner do
       runner.add_node(:invalid) { |value| Success(value) }
       runner.add_edge(start, :invalid)
 
-      expect { runner.run(start:, input: :value) }
+      expect { runner.run(start:, state: :value) }
         .to raise_error(TypeError, /must return \[Workflow::Signal, value\]/)
     end
   end
@@ -128,14 +128,14 @@ describe Workflow::Runner do
       runner.add_node(:invalid) { |_value| 'not a result' }
       runner.add_edge(start, :invalid)
 
-      expect { runner.run(start:, input: :value) }
+      expect { runner.run(start:, state: :value) }
         .to raise_error(TypeError, /must return a Workflow::Result/)
     end
 
     it 'requires a start vertex when running' do
       runner = Workflow::Runner.new
 
-      expect { runner.run(start: Workflow::Vertex(:start), input: :value) }
+      expect { runner.run(start: Workflow::Vertex(:start), state: :value) }
         .to raise_error(ArgumentError, /start must be a Workflow::Vertex::Start/)
     end
   end

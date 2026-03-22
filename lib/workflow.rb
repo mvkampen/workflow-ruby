@@ -14,8 +14,10 @@ module Workflow
 
   def Success(value = nil) = Success.new(value)
   def Failure(error = nil) = Failure.new(error)
-  def Continue(value = nil) = Signal::Continue.new(value)
-  def Stop(value = nil) = Signal::Stop.new(value)
+  def Continue = Signal::Continue.new
+  def Compensate(error) = Signal::Compensate.new(error)
+  def Retry(error) = Signal::Retry.new(error)
+  def Stop(result = Signal::Stop::UNSET) = Signal::Stop.new(result)
   def Start = Vertex::Start.new
   def Edge(from:, to:) = Edge.new(from:, to:)
   def Vertex(name) = Vertex.new(name)
