@@ -3,3 +3,8 @@
 /pkg/
 /tmp/
 *.gem
+*.rbc
+/.config
+/coverage/
+/tmp/
+.rvmrc
