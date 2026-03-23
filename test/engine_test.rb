@@ -82,6 +82,37 @@ describe Workflow::Execution::Engine do
         .to raise_error(TypeError, /must return \[Workflow::Signal, value\]/)
     end
 
+    it 'fans out branch work until the join node and reduces the results there' do
+      start = Workflow::Vertex::Start.new
+
+      work = Class.new do
+        def call(item)
+          Workflow::Success([Workflow::Continue(), item * 2])
+        end
+      end.new.freeze
+
+      graph = Workflow::Graph.new
+      graph.add_node(:divide) do |state|
+        Success([FanOut(join: :join, items: [1, 2, 3]), state])
+      end
+      graph.add_node(:work, work)
+      graph.add_node(:join) do |results|
+        sum = results.sum(10, &:value!)
+
+        Success([Continue(), sum])
+      end
+      graph.add_node(:end) do |sum|
+        Success([Stop(), sum])
+      end
+      graph.add_edge(start, :divide)
+      graph.add_edge(:divide, :work)
+      graph.add_edge(:work, :join)
+      graph.add_edge(:join, :end)
+
+      engine = Workflow::Execution::Engine.new(graph:)
+
+      expect(engine.run(start:, state: 10)).to eq(Success(22))
+    end
   end
 
   describe 'validation' do

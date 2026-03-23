@@ -16,10 +16,24 @@ module Workflow
   def Success(value = nil) = Success.new(value)
   def Failure(error = nil) = Failure.new(error)
   def Continue = Signal::Continue.new
+  def FanOut(join:, items:) = Signal::FanOut.new(join: normalize_vertex(join), items:)
   def Compensate(error) = Signal::Compensate.new(error)
   def Retry(error) = Signal::Retry.new(error)
   def Stop(result = Signal::Stop::UNSET) = Signal::Stop.new(result)
   def Start = Vertex::Start.new
   def Edge(from:, to:) = Edge.new(from:, to:)
   def Vertex(name) = Vertex.new(name)
+
+  def normalize_vertex(value)
+    case value
+    in Vertex then value
+    in Symbol
+      Vertex.new(value)
+    in String
+      Vertex.new(value.to_sym)
+    else
+      raise ArgumentError, "unsupported vertex #{value.inspect}"
+    end
+  end
+  private_class_method :normalize_vertex
 end

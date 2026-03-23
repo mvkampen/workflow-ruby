@@ -18,10 +18,37 @@ module Workflow
 
     class Continue < Signal; end
 
+    class FanOut < Signal
+      attr_reader :join, :items
+
+      def initialize(join:, items:)
+        super()
+
+        @join = join
+        @items = items
+        freeze
+      end
+
+      def ==(other)
+        super && other.deconstruct == deconstruct
+      end
+      alias eql? ==
+
+      def hash
+        [self.class, deconstruct].hash
+      end
+
+      def deconstruct
+        [@join, @items]
+      end
+    end
+
     class Stop < Signal
-      UNSET = Object.new
+      UNSET = Object.new.freeze
 
       def initialize(result = UNSET)
+        super()
+
         @result = result
         freeze
       end
@@ -44,6 +71,8 @@ module Workflow
 
     class Error < Signal
       def initialize(error)
+        super()
+
         @error = error
         freeze
       end

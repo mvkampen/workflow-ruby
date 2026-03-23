@@ -6,6 +6,10 @@ describe Workflow::Signal do
   describe 'pattern matching' do
     it 'supports class-pattern matching for control and error signals' do
       continue_signal = Workflow::Continue()
+      fan_out_signal = Workflow::FanOut(
+        join: :join,
+        items: [1, 2, 3]
+      )
       compensate_signal = Workflow::Compensate(:rollback)
       retry_signal = Workflow::Retry(3)
       stop_signal = Workflow::Stop(:done)
@@ -15,6 +19,11 @@ describe Workflow::Signal do
                        in Workflow::Signal::Continue
                          :continue
                        end
+
+      fan_out_match = case fan_out_signal
+                      in Workflow::Signal::FanOut(Workflow::Vertex(:join), Array => items)
+                        items
+                      end
 
       compensate_match = case compensate_signal
                          in Workflow::Signal::Compensate(Symbol => error)
@@ -37,6 +46,7 @@ describe Workflow::Signal do
                          end
 
       expect(continue_match).to eq(:continue)
+      expect(fan_out_match).to eq([1, 2, 3])
       expect(compensate_match).to eq(:rollback)
       expect(retry_match).to eq(3)
       expect(stop_match).to eq(:done)
