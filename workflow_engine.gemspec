@@ -21,7 +21,7 @@ Gem::Specification.new do |spec|
     'README.md',
     'bin/*',
     'lib/**/*.rb',
-    'spec/**/*.rb'
+    'test/**/*.rb'
   ]
   spec.bindir = 'bin'
   spec.executables = %w[]
