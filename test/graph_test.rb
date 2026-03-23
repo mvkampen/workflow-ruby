@@ -13,6 +13,38 @@ describe Workflow::Graph do
       expect(vertex).to eq(Workflow::Vertex.new(:example))
       expect(registered_node).to eq(node)
     end
+
+    it 'raises when the vertex is already registered' do
+      graph = Workflow::Graph.new
+      graph.add_node(:example) { |value| Workflow::Success(value) }
+
+      error = assert_raises(Workflow::Graph::DuplicateVertexError) do
+        graph.add_node(:example) { |value| Workflow::Success(value) }
+      end
+
+      expect(error.vertex).to eq(Workflow::Vertex.new(:example))
+    end
+  end
+
+  describe '#replace_node' do
+    it 'replaces an existing node explicitly' do
+      graph = Workflow::Graph.new
+      graph.add_node(:example) { |value| Workflow::Success(value) }
+
+      _, node = graph.replace_node(:example) { |value| Workflow::Success(value * 2) }
+
+      expect(node.call(3)).to eq(Workflow::Success(6))
+    end
+
+    it 'raises when replacing an unknown vertex' do
+      graph = Workflow::Graph.new
+
+      error = assert_raises(Workflow::Graph::UnknownVertexError) do
+        graph.replace_node(:missing) { |value| Workflow::Success(value) }
+      end
+
+      expect(error.vertex).to eq(Workflow::Vertex.new(:missing))
+    end
   end
 
   describe '#add_edge' do
@@ -27,6 +59,28 @@ describe Workflow::Graph do
       expect(edge.from).to eq(Workflow::Vertex.new(:first))
       expect(edge.to).to eq(Workflow::Vertex.new(:second))
     end
+
+    it 'raises a specialized error when the source vertex is unknown' do
+      graph = Workflow::Graph.new
+      graph.add_node(:known) { |value| Workflow::Success(value) }
+
+      error = assert_raises(Workflow::Graph::UnknownVertexError) do
+        graph.add_edge(:missing, :known)
+      end
+
+      expect(error.vertex).to eq(Workflow::Vertex.new(:missing))
+    end
+
+    it 'raises a specialized error when the target vertex is unknown' do
+      graph = Workflow::Graph.new
+      graph.add_node(:known) { |value| Workflow::Success(value) }
+
+      error = assert_raises(Workflow::Graph::UnknownVertexError) do
+        graph.add_edge(Workflow::Start(), :missing)
+      end
+
+      expect(error.vertex).to eq(Workflow::Vertex.new(:missing))
+    end
   end
 
   describe '#next_vertex_from' do
@@ -37,6 +91,27 @@ describe Workflow::Graph do
       graph.add_edge(start, :first)
 
       expect(graph.next_vertex_from(start)).to eq(Workflow::Vertex.new(:first))
+    end
+
+    it 'raises when a known vertex has no outgoing edge' do
+      graph = Workflow::Graph.new
+      graph.add_node(:first) { |value| Workflow::Success(value) }
+
+      error = assert_raises(Workflow::Graph::MissingOutgoingEdgeError) do
+        graph.next_vertex_from(:first)
+      end
+
+      expect(error.vertex).to eq(Workflow::Vertex.new(:first))
+    end
+
+    it 'raises when an unknown vertex is used for outgoing edge lookup' do
+      graph = Workflow::Graph.new
+
+      error = assert_raises(Workflow::Graph::UnknownVertexError) do
+        graph.next_vertex_from(:missing)
+      end
+
+      expect(error.vertex).to eq(Workflow::Vertex.new(:missing))
     end
   end
 
@@ -57,4 +132,5 @@ describe Workflow::Graph do
         .to raise_error(FrozenError, /can't modify frozen/)
     end
   end
+
 end

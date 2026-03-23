@@ -49,7 +49,7 @@ describe Workflow::Runner do
       runner = Workflow::Runner.new(graph)
 
       expect { runner.run(start:, state: nil) }
-        .to raise_error(KeyError, /unknown outgoing edge/)
+        .to raise_error(Workflow::Graph::MissingOutgoingEdgeError, /no outgoing edge/)
     end
 
     it 'raises when a vertex has multiple outgoing direct edges' do
