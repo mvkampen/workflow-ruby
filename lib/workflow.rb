@@ -6,6 +6,7 @@ require_relative 'workflow/signal'
 require_relative 'workflow/edge'
 require_relative 'workflow/node'
 require_relative 'workflow/vertex'
+require_relative 'workflow/graph'
 require_relative 'workflow/runner'
 
 # Workflow engine to run isolated workflow steps with clear success/failure semantics.
