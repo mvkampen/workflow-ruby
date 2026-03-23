@@ -17,9 +17,9 @@ describe Workflow::MathExample do
       graph.add_edge(start, :done?)
       graph.add_edge(:done?, :choose_move)
 
-      runner = Workflow::Runner.new(graph)
+      engine = Workflow::Execution::Engine.new(graph:)
 
-      expect(runner.run(start:, state: state.with(value: 24))).to eq(Success(state.with(value: 24)))
+      expect(engine.run(start:, state: state.with(value: 24))).to eq(Success(state.with(value: 24)))
     end
 
     it 'returns retry when the value is a multiple of five' do
@@ -30,9 +30,9 @@ describe Workflow::MathExample do
       graph.add_node(:done?, done?(target: 24))
       graph.add_edge(start, :done?)
 
-      runner = Workflow::Runner.new(graph)
+      engine = Workflow::Execution::Engine.new(graph:)
 
-      expect(runner.run(start:, state: retry_state)).to eq(
+      expect(engine.run(start:, state: retry_state)).to eq(
         Success([Retry(Workflow::MathExample::MultipleOfFive.new('value 20 is a multiple of 5')), retry_state])
       )
     end
@@ -45,8 +45,8 @@ describe Workflow::MathExample do
       graph.add_node(:done?, done?(target: 24))
       graph.add_edge(start, :done?)
 
-      runner = Workflow::Runner.new(graph)
-      expect(runner.run(start:, state: compensate_state)).to eq(
+      engine = Workflow::Execution::Engine.new(graph:)
+      expect(engine.run(start:, state: compensate_state)).to eq(
         Success([Compensate(Workflow::MathExample::OvershotLimit.new('value 26 exceeds 24')), compensate_state])
       )
     end
@@ -61,8 +61,8 @@ describe Workflow::MathExample do
       graph.add_edge(start, :done?)
       graph.add_edge(:done?, :choose_move)
 
-      runner = Workflow::Runner.new(graph)
-      continue_result = runner.run(start:, state: continue_state)
+      engine = Workflow::Execution::Engine.new(graph:)
+      continue_result = engine.run(start:, state: continue_state)
 
       expect(continue_result).to eq(Success(continue_state))
     end
@@ -81,8 +81,8 @@ describe Workflow::MathExample do
       graph.add_edge(:choose_move, :apply_move)
       graph.add_edge(:apply_move, :finish)
 
-      runner = Workflow::Runner.new(graph)
-      result = runner.run(start:, state: initial_state)
+      engine = Workflow::Execution::Engine.new(graph:)
+      result = engine.run(start:, state: initial_state)
 
       expect(result).to eq(
         Success(
@@ -109,8 +109,8 @@ describe Workflow::MathExample do
       graph.add_edge(:choose_move, :apply_move)
       graph.add_edge(:apply_move, :finish)
 
-      runner = Workflow::Runner.new(graph)
-      expect(runner.run(start:, state: initial_state)).to eq(
+      engine = Workflow::Execution::Engine.new(graph:)
+      expect(engine.run(start:, state: initial_state)).to eq(
         Success([{ move: :double, from: 11, to: 22 }])
       )
     end
@@ -123,8 +123,8 @@ describe Workflow::MathExample do
       graph.add_node(:finish) { |_state| Success([Stop(nil), nil]) }
       graph.add_edge(start, :finish)
 
-      runner = Workflow::Runner.new(graph)
-      expect(runner.run(start:, state: initial_state)).to eq(Success(nil))
+      engine = Workflow::Execution::Engine.new(graph:)
+      expect(engine.run(start:, state: initial_state)).to eq(Success(nil))
     end
 
     it 'lets the planner make risky choices that can still fail at done?' do
@@ -139,8 +139,8 @@ describe Workflow::MathExample do
       graph.add_edge(:choose_move, :apply_move)
       graph.add_edge(:apply_move, :done?)
 
-      runner = Workflow::Runner.new(graph)
-      expect(runner.run(start:, state: initial_state)).to eq(
+      engine = Workflow::Execution::Engine.new(graph:)
+      expect(engine.run(start:, state: initial_state)).to eq(
         Success([
                   Retry(Workflow::MathExample::MultipleOfFive.new('value 20 is a multiple of 5')),
                   Workflow::MathExample::State.new(
@@ -166,8 +166,8 @@ describe Workflow::MathExample do
       graph.add_edge(:choose_move, :apply_move)
       graph.add_edge(:apply_move, :done?)
 
-      runner = Workflow::Runner.new(graph)
-      first_pass = runner.run(start:, state:)
+      engine = Workflow::Execution::Engine.new(graph:)
+      first_pass = engine.run(start:, state:)
 
       expect(first_pass).to eq(
         Success([
@@ -185,7 +185,7 @@ describe Workflow::MathExample do
       signal, retried_state = first_pass.value!
       expect(signal).to eq(Retry(Workflow::MathExample::MultipleOfFive.new('value 20 is a multiple of 5')))
 
-      second_pass = runner.run(start:, state: retried_state.with(value: retried_state.value + 1))
+      second_pass = engine.run(start:, state: retried_state.with(value: retried_state.value + 1))
 
       expect(second_pass).to eq(
         Success(
@@ -213,8 +213,8 @@ describe Workflow::MathExample do
       graph.add_edge(start, :reset_to_seed)
       graph.add_edge(:reset_to_seed, :finish)
 
-      runner = Workflow::Runner.new(graph)
-      expect(runner.run(start:, state: initial_state)).to eq(
+      engine = Workflow::Execution::Engine.new(graph:)
+      expect(engine.run(start:, state: initial_state)).to eq(
         Success(
           Workflow::MathExample::State.new(
             seed: 11,
