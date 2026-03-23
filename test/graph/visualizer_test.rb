@@ -2,7 +2,7 @@
 
 require 'test_helper'
 require 'workflow/graph/visualizer'
-require_relative 'examples/math_example'
+require_relative '../examples/math_example'
 
 describe Workflow::Graph::Visualizer do
   include Workflow::MathExample
