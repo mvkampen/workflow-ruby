@@ -1,7 +1,12 @@
 # frozen_string_literal: true
 
+require_relative 'dispatcher'
+require_relative 'join_aggregator'
+
 module Workflow
   module Execution
+    # The Engine is responsible for executing a workflow graph. It starts from a given vertex and initial state,
+    # and processes nodes according to the graph structure and the signals returned by each node.
     class Engine
       Continuation = Data.define(:vertex, :output, :state) do
         def initialize(vertex:, state:, output: nil)
@@ -16,8 +21,10 @@ module Workflow
         end
       end.new.freeze
 
-      def initialize(graph:)
+      def initialize(graph:, dispatcher: nil)
         @graph = graph
+        @dispatcher = dispatcher || default_dispatcher
+        @workflow_id = "workflow-#{object_id}"
       end
 
       def run(start:, state:)
@@ -43,10 +50,16 @@ module Workflow
 
       private
 
+      def default_dispatcher
+        return Dispatcher.default if Ractor.current == Ractor.main
+
+        Dispatcher.new(max_processors: 1)
+      end
+
       def advance(signal, state, current_vertex)
         case signal
         in Signal::FanOut => fan_out
-          Continuation.new(vertex: fan_out.join, state: fan_out_results(fan_out, current_vertex))
+          fan_out_continuation(fan_out, current_vertex)
         in Signal::Stop()
           Continuation.new(vertex: current_vertex, output: Workflow::Success(state), state:)
         in Signal::Stop(result)
@@ -60,16 +73,44 @@ module Workflow
         end
       end
 
-      def fan_out_results(signal, current_vertex)
+      def fan_out_continuation(signal, current_vertex)
         branch_start = @graph.next_vertex_from(current_vertex)
         branch_graph, branch_start_vertex = build_branch_graph(start_vertex: branch_start, join_vertex: signal.join)
         branch_graph = ensure_shareable_graph!(branch_graph)
+        branch_items = normalize_branch_items(signal.items)
 
-        signal.items.map do |item|
-          Ractor.new(branch_graph, branch_start_vertex, item) do |graph, start_vertex, branch_state|
-            Workflow::Execution::Engine.new(graph:).run(start: start_vertex, state: branch_state)
+        join_aggregator = JoinAggregator.new(
+          node: signal.join,
+          branches: branch_items.map(&:first),
+          reducer: Workflow::Reducers.resolve(signal.reducer)
+        )
+
+        @dispatcher.dispatch(
+          branch_graph:,
+          start_vertex: branch_start_vertex,
+          items: signal.items,
+          workflow_id: @workflow_id,
+          node: current_vertex.name
+        ) do |branch_result|
+          tracked_result = join_aggregator.record(branch_result)
+          next unless tracked_result
+
+          if Result.valid_result?(tracked_result) && tracked_result.failure?
+            return Continuation.new(vertex: current_vertex, output: tracked_result, state: nil)
           end
-        end.map(&:take)
+
+          return Continuation.new(vertex: join_aggregator.node, state: tracked_result)
+        end
+
+        raise ArgumentError, "fan-out join #{signal.join.inspect} did not produce a completion"
+      end
+
+      def normalize_branch_items(items)
+        if items.is_a?(Hash)
+          items.to_a
+        else
+          items.each_with_index.map { |item, branch| [branch, item] }
+        end
       end
 
       # To handle it as a complete branch, it requires a start and terminal node.

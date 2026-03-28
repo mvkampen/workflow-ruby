@@ -93,11 +93,11 @@ describe Workflow::Execution::Engine do
 
       graph = Workflow::Graph.new
       graph.add_node(:divide) do |state|
-        Success([FanOut(join: :join, items: [1, 2, 3]), state])
+        Success([FanOut(join: :join, items: [1, 2, 3], reducer: :values), state])
       end
       graph.add_node(:work, work)
       graph.add_node(:join) do |results|
-        sum = results.sum(10, &:value!)
+        sum = results.sum(10)
 
         Success([Continue(), sum])
       end
@@ -112,6 +112,64 @@ describe Workflow::Execution::Engine do
       engine = Workflow::Execution::Engine.new(graph:)
 
       expect(engine.run(start:, state: 10)).to eq(Success(22))
+    end
+
+    it 'reduces branch outcomes before resuming at the join vertex' do
+      start = Workflow::Vertex::Start.new
+
+      work = Class.new do
+        def call(item)
+          Workflow::Success([Workflow::Continue(), item * 2])
+        end
+      end.new.freeze
+
+      graph = Workflow::Graph.new
+      graph.add_node(:divide) do |state|
+        Success([FanOut(join: :join, items: [1, 2, 3], reducer: :sum), state])
+      end
+      graph.add_node(:work, work)
+      graph.add_node(:join) do |sum|
+        Success([Continue(), sum + 10])
+      end
+      graph.add_node(:end) do |sum|
+        Success([Stop(), sum])
+      end
+      graph.add_edge(start, :divide)
+      graph.add_edge(:divide, :work)
+      graph.add_edge(:work, :join)
+      graph.add_edge(:join, :end)
+
+      engine = Workflow::Execution::Engine.new(graph:)
+
+      expect(engine.run(start:, state: 0)).to eq(Success(22))
+    end
+
+    it 'preserves item enumeration order for the values reducer' do
+      start = Workflow::Vertex::Start.new
+      items = ('a'..'z').to_a.shuffle(random: Random.new(12_345))
+                              .each_with_index.to_h { |item, index| [item.to_sym, index + 1] }
+
+      work = Class.new do
+        def call(item)
+          Workflow::Success([Workflow::Continue(), item])
+        end
+      end.new.freeze
+
+      graph = Workflow::Graph.new
+      graph.add_node(:divide) do |state|
+        Success([FanOut(join: :join, items:, reducer: :values), state])
+      end
+      graph.add_node(:work, work)
+      graph.add_node(:join) do |values|
+        Success([Stop(), values])
+      end
+      graph.add_edge(start, :divide)
+      graph.add_edge(:divide, :work)
+      graph.add_edge(:work, :join)
+
+      engine = Workflow::Execution::Engine.new(graph:)
+
+      expect(engine.run(start:, state: nil)).to eq(Success(items.values))
     end
   end
 

@@ -132,5 +132,4 @@ describe Workflow::Graph do
         .to raise_error(FrozenError, /can't modify frozen/)
     end
   end
-
 end

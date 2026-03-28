@@ -7,6 +7,8 @@ require_relative 'workflow/edge'
 require_relative 'workflow/node'
 require_relative 'workflow/vertex'
 require_relative 'workflow/graph'
+require_relative 'workflow/reducer'
+require_relative 'workflow/reducers'
 require_relative 'workflow/execution/engine'
 
 # Workflow engine to run isolated workflow steps with clear success/failure semantics.
@@ -16,7 +18,7 @@ module Workflow
   def Success(value = nil) = Success.new(value)
   def Failure(error = nil) = Failure.new(error)
   def Continue = Signal::Continue.new
-  def FanOut(join:, items:) = Signal::FanOut.new(join: normalize_vertex(join), items:)
+  def FanOut(join:, items:, reducer: :values) = Signal::FanOut.new(join: normalize_vertex(join), items:, reducer:)
   def Compensate(error) = Signal::Compensate.new(error)
   def Retry(error) = Signal::Retry.new(error)
   def Stop(result = Signal::Stop::UNSET) = Signal::Stop.new(result)
